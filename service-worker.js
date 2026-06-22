@@ -1,42 +1,52 @@
 const CACHE_NAME = 'daily-routine-tracker-v1';
 const RUNTIME_CACHE = 'daily-routine-tracker-runtime-v1';
 const URLS_TO_CACHE = [
-  './',
-  './daily_routine_tracker.html',
-  './manifest.json'
+  '/',
+  '/daily_routine_tracker.html',
+  '/manifest.json'
 ];
 
-// Install event - cache core files
+// Install event
 self.addEventListener('install', event => {
+  console.log('[Service Worker] Installing...');
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(URLS_TO_CACHE).catch(err => {
-        console.log('Cache addAll error:', err);
-        // Continue even if caching fails
-        return Promise.resolve();
-      });
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('[Service Worker] Caching core files');
+        return cache.addAll(URLS_TO_CACHE).catch(err => {
+          console.log('[Service Worker] Cache addAll error (non-critical):', err);
+        });
+      })
+      .catch(err => {
+        console.log('[Service Worker] Install error:', err);
+      })
   );
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event
 self.addEventListener('activate', event => {
+  console.log('[Service Worker] Activating...');
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys()
+      .then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cacheName => {
+            if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
+              console.log('[Service Worker] Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+      .catch(err => {
+        console.log('[Service Worker] Activate error:', err);
+      })
   );
   self.clients.claim();
 });
 
-// Fetch event - network first with fallback to cache
+// Fetch event
 self.addEventListener('fetch', event => {
   const { request } = event;
   
@@ -45,58 +55,64 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // For CDN resources (Tailwind, React, Babel)
+  // Handle CDN resources
   if (request.url.includes('cdn.tailwindcss.com') || 
-      request.url.includes('unpkg.com')) {
+      request.url.includes('unpkg.com') ||
+      request.url.includes('cdnjs')) {
     event.respondWith(
-      caches.open(RUNTIME_CACHE).then(cache => {
-        return fetch(request)
-          .then(response => {
-            if (response && response.status === 200) {
-              cache.put(request, response.clone());
-            }
-            return response;
-          })
-          .catch(() => {
-            return cache.match(request);
-          });
-      })
+      caches.open(RUNTIME_CACHE)
+        .then(cache => {
+          return fetch(request)
+            .then(response => {
+              if (response && response.status === 200) {
+                cache.put(request, response.clone());
+              }
+              return response;
+            })
+            .catch(() => {
+              return cache.match(request);
+            });
+        })
+        .catch(() => {
+          return fetch(request);
+        })
     );
     return;
   }
 
-  // For local resources
+  // Handle local resources
   event.respondWith(
-    caches.match(request).then(response => {
-      if (response) {
-        return response;
-      }
-
-      return fetch(request).then(response => {
-        if (!response || response.status !== 200 || response.type === 'error') {
+    caches.match(request)
+      .then(response => {
+        if (response) {
           return response;
         }
 
-        const responseClone = response.clone();
-        caches.open(RUNTIME_CACHE).then(cache => {
-          cache.put(request, responseClone);
-        });
+        return fetch(request)
+          .then(response => {
+            if (!response || response.status !== 200) {
+              return response;
+            }
 
-        return response;
-      }).catch(() => {
-        // Return offline page or cached response
-        return caches.match(request);
-      });
-    })
+            const responseClone = response.clone();
+            caches.open(RUNTIME_CACHE)
+              .then(cache => {
+                cache.put(request, responseClone);
+              })
+              .catch(err => {
+                console.log('[Service Worker] Cache put error:', err);
+              });
+
+            return response;
+          })
+          .catch(err => {
+            console.log('[Service Worker] Fetch error for', request.url, err);
+            return caches.match(request);
+          });
+      })
+      .catch(err => {
+        console.log('[Service Worker] Match error:', err);
+        return fetch(request);
+      })
   );
-});
-
-// Background sync for future offline tracking (optional)
-self.addEventListener('sync', event => {
-  if (event.tag === 'sync-routines') {
-    event.waitUntil(
-      // Sync routine data when connection is restored
-      Promise.resolve()
-    );
-  }
 });
