@@ -1,8 +1,6 @@
 {
   "buildCommand": "echo 'Static PWA app - no build needed'",
   "outputDirectory": ".",
-  "cleanUrls": false,
-  "trailingSlash": false,
   "headers": [
     {
       "source": "/service-worker.js",
@@ -17,7 +15,7 @@
         },
         {
           "key": "Content-Type",
-          "value": "application/javascript"
+          "value": "application/javascript; charset=utf-8"
         }
       ]
     },
@@ -30,16 +28,20 @@
         },
         {
           "key": "Content-Type",
-          "value": "application/json"
+          "value": "application/json; charset=utf-8"
         }
       ]
     },
     {
-      "source": "/**/*.html",
+      "source": "/(.*\\.html)",
       "headers": [
         {
           "key": "Cache-Control",
           "value": "public, max-age=0, must-revalidate"
+        },
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
         }
       ]
     }
