@@ -1,7 +1,7 @@
 {
-  "name": "daily-routine-tracker",
+  "name": "trax-app",
   "version": "1.0.0",
-  "description": "Daily Routine Tracker - Track your daily routines and habits with ease",
+  "description": "Trax - Your Daily Routine Tracker",
   "private": true,
   "keywords": [
     "routine",
